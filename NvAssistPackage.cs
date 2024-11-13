@@ -245,6 +245,34 @@ internal class TextViewCreationListener : IWpfTextViewCreationListener
 
             string ftllmResponse = await QueryQwenFinetuned(queryText);
             ftllmResponse = "\n" + ftllmResponse.Replace("\\n", "\n");
+
+            // Check if the response contains "```" tags
+            const string codeTag = "```";
+            if (ftllmResponse.Contains(codeTag))
+            {
+                // Find the first and last occurrence of "```"
+                int firstTagIndex = ftllmResponse.IndexOf(codeTag);
+                int lastTagIndex = ftllmResponse.LastIndexOf(codeTag);
+
+                // Ensure there are at least two "```" tags before proceeding
+                if (firstTagIndex != lastTagIndex)
+                {
+                    // Find the index of the newline after the first "```" tag
+                    int firstNewlineAfterTag = ftllmResponse.IndexOf('\n', firstTagIndex);
+
+                    // If no newline is found, default to the end of string
+                    if (firstNewlineAfterTag == -1)
+                    {
+                        firstNewlineAfterTag = ftllmResponse.Length;
+                    }
+
+                    // Extract content between the newline after the first tag and just before the last tag
+                    int startIndex = firstNewlineAfterTag + 1;  // Start after the newline
+                    int length = lastTagIndex - startIndex;
+                    ftllmResponse = ftllmResponse.Substring(startIndex, length).Trim();
+                }
+            }
+
             Message("LLM Response: " + ftllmResponse);
 
             using (var edit = docView.TextBuffer.CreateEdit())
@@ -252,8 +280,8 @@ internal class TextViewCreationListener : IWpfTextViewCreationListener
                 // If there's a selection, replace it; otherwise, insert at caret
                 if (!selection.IsEmpty)
                 {
-                    var selectedSpan = selection.SelectedSpans[0];
-                    edit.Replace(selectedSpan, ftllmResponse);
+                    var selectedSpan = selection.SelectedSpans;
+                    edit.Replace(selectedSpan[0], ftllmResponse);
                 }
                 else
                 {
@@ -265,6 +293,7 @@ internal class TextViewCreationListener : IWpfTextViewCreationListener
                 var newCaretPosition = pos.Position + ftllmResponse.Length;
                 docView.TextView.Caret.MoveTo(new SnapshotPoint(docView.TextBuffer.CurrentSnapshot, newCaretPosition));
             }
+
             numCaps = 0;
         }
     }
