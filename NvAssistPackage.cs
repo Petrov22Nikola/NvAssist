@@ -190,6 +190,8 @@ internal class TextViewCreationListener : IWpfTextViewCreationListener
             numCaps = 0;
         }
 
+        if (numCaps != capsThreshold && numShifts != shiftThreshold) return;
+
         DocumentView docView = await VS.Documents.GetActiveDocumentViewAsync();
         if (docView?.TextView == null) return;
 
