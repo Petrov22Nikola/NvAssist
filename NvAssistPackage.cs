@@ -22,39 +22,60 @@ using System.Windows;
 using System.Collections.Generic;
 using System.Windows.Media.TextFormatting;
 using System.Linq;
+using System.Reflection;
+using System.Diagnostics;
 
 [Export(typeof(IWpfTextViewCreationListener))]
 [ContentType("text")]
 [TextViewRole(PredefinedTextViewRoles.Editable)]
 internal class TextViewCreationListener : IWpfTextViewCreationListener
 {
-    async Task<string> QueryOllama(string text)
+    async Task<string> QueryQwenFinetuned(string text)
     {
         using (var client = new HttpClient())
         {
-            var payload = new
-            {
-                prompt = text,
-                model = "codegemma:2b",
-                options = new
-                {
-                    max_length = 128,
-                    stop = new[] { "<|fim_prefix|>", "<|fim_suffix|>", "<|fim_middle|>", "<|file_separator|>" }
-                }
-            };
+            var payload = new { prompt = text };
 
             var jsonPayload = JsonConvert.SerializeObject(payload);
             var content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
 
-            var response = await client.PostAsync("http://localhost:11434/api/generate", content);
+            // Query the local FastAPI server
+            var response = await client.PostAsync("http://localhost:8000/generate", content);
 
             if (response.IsSuccessStatusCode)
             {
-                return await StreamJsonResponseAsync(response);
+                string vuidCheck = await response.Content.ReadAsStringAsync();
+                vuidCheck = vuidCheck.Trim('"');
+                return vuidCheck;
             }
             else
             {
-                throw new Exception("Failed to get response from Ollama");
+                throw new Exception("Failed to get response from Hugging Face model");
+            }
+        }
+    }
+
+    async Task<string> QueryGemma(string text)
+    {
+        using (var client = new HttpClient())
+        {
+            var payload = new { prompt = text };
+
+            var jsonPayload = JsonConvert.SerializeObject(payload);
+            var content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
+
+            // Query the local FastAPI server
+            var response = await client.PostAsync("http://localhost:8000/autocomplete", content);
+
+            if (response.IsSuccessStatusCode)
+            {
+                string autoCode = await response.Content.ReadAsStringAsync();
+                autoCode = autoCode.Trim('"');
+                return autoCode;
+            }
+            else
+            {
+                throw new Exception("Failed to get response from Hugging Face model");
             }
         }
     }
@@ -98,7 +119,7 @@ internal class TextViewCreationListener : IWpfTextViewCreationListener
     private string GetFimPrefix(ITextSnapshotLine currentLine)
     {
         var snapshot = currentLine.Snapshot;
-        int startLineNumber = Math.Max(currentLine.LineNumber - 5, 0);
+        int startLineNumber = Math.Max(currentLine.LineNumber - 10, 0);
 
         var lines = new List<string>();
         for (int i = startLineNumber; i <= currentLine.LineNumber; ++i)
@@ -112,7 +133,7 @@ internal class TextViewCreationListener : IWpfTextViewCreationListener
     private string GetFimSuffix(ITextSnapshotLine currentLine)
     {
         var snapshot = currentLine.Snapshot;
-        int endLineNumber = Math.Min(currentLine.LineNumber + 5, snapshot.LineCount - 1);
+        int endLineNumber = Math.Min(currentLine.LineNumber + 10, snapshot.LineCount - 1);
 
         var lines = new List<string>();
         for (int i = currentLine.LineNumber + 1; i <= endLineNumber; i++)
@@ -123,42 +144,128 @@ internal class TextViewCreationListener : IWpfTextViewCreationListener
         return string.Join("\n", lines);
     }
 
-    int numShifts = 0, activationThreshold = 2;
+    int numShifts = 0, numCaps = 0, shiftThreshold = 2, capsThreshold = 2;
+    private DateTime lastCapsLockTime = DateTime.MinValue;
+    private DateTime lastShiftTime = DateTime.MinValue;
 
     private async void OnKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
     {
-        if (e.Key == System.Windows.Input.Key.LeftShift) ++numShifts;
-        else numShifts = 0;
+        var currentTime = DateTime.Now;
 
-        if (numShifts == activationThreshold)
+        if (e.Key == System.Windows.Input.Key.LeftShift)
         {
-            DocumentView docView = await VS.Documents.GetActiveDocumentViewAsync();
-            if (docView?.TextView == null) return;
+            // Check time difference for Shift key
+            if (currentTime - lastShiftTime < TimeSpan.FromSeconds(0.3))
+            {
+                ++numShifts;
+                lastShiftTime = currentTime;
+            }
+            else
+            {
+                numShifts = 1;
+                lastShiftTime = currentTime;
+            }
+        }
+        else
+        {
+            numShifts = 0;
+        }
 
-            SnapshotPoint pos = docView.TextView.Caret.Position.BufferPosition;
-            ITextSnapshot ss = docView.TextBuffer.CurrentSnapshot;
-            ITextSnapshotLine currentLine = ss.GetLineFromPosition(pos);
+        if (e.Key == System.Windows.Input.Key.CapsLock)
+        {
+            // Check time difference for Caps Lock key
+            if (currentTime - lastCapsLockTime < TimeSpan.FromSeconds(0.5))
+            {
+                ++numCaps;
+                lastCapsLockTime = currentTime;
+            }
+            else
+            {
+                numCaps = 1;
+                lastCapsLockTime = currentTime;
+            }
+        }
+        else
+        {
+            numCaps = 0;
+        }
 
+        DocumentView docView = await VS.Documents.GetActiveDocumentViewAsync();
+        if (docView?.TextView == null) return;
+
+        SnapshotPoint pos = docView.TextView.Caret.Position.BufferPosition;
+        ITextSnapshot ss = docView.TextBuffer.CurrentSnapshot;
+        ITextSnapshotLine currentLine = ss.GetLineFromPosition(pos);
+
+        if (numShifts == shiftThreshold)
+        {
             string fimPrefix = GetFimPrefix(currentLine);
             string fimSuffix = GetFimSuffix(currentLine);
 
             string fimPrompt = $"<|fim_prefix|>{fimPrefix}<|fim_suffix|>{fimSuffix}<|fim_middle|>";
             Message("Query: " + fimPrompt);
 
-            string llmResponse = await QueryOllama(fimPrompt);
+            string llmResponse = await QueryGemma(fimPrompt);
+            llmResponse = llmResponse.Replace("\\n", "\n");
+            string[] stopTokens = { "<|fim_prefix|>", "<|fim_suffix|>", "<|fim_middle|>", "<|file_separator|>" };
+            foreach (var stopToken in stopTokens)
+            {
+                llmResponse = llmResponse.Replace(stopToken, string.Empty);
+            }
+
             Message("LLM Response: " + llmResponse);
 
             using (var edit = docView.TextBuffer.CreateEdit())
             {
-                // Insert the suggestion directly at the caret's current position
                 edit.Insert(pos, llmResponse);
                 edit.Apply();
 
-                // Move the caret to the end of the inserted text
                 var newCaretPosition = pos.Position + llmResponse.Length;
                 docView.TextView.Caret.MoveTo(new SnapshotPoint(docView.TextBuffer.CurrentSnapshot, newCaretPosition));
             }
             numShifts = 0;
+        }
+
+        if (numCaps == capsThreshold)
+        {
+            // Check if there's a text selection
+            var selection = docView.TextView.Selection;
+            string queryText;
+
+            if (!selection.IsEmpty)
+            {
+                // Use the selected text as the query
+                queryText = selection.SelectedSpans[0].GetText();
+            }
+            else
+            {
+                // Fall back to current line if no selection
+                queryText = currentLine.GetText();
+            }
+
+            string ftllmResponse = await QueryQwenFinetuned(queryText);
+            ftllmResponse = "\n" + ftllmResponse.Replace("\\n", "\n");
+            Message("LLM Response: " + ftllmResponse);
+
+            using (var edit = docView.TextBuffer.CreateEdit())
+            {
+                // If there's a selection, replace it; otherwise, insert at caret
+                if (!selection.IsEmpty)
+                {
+                    var selectedSpan = selection.SelectedSpans[0];
+                    edit.Replace(selectedSpan, ftllmResponse);
+                }
+                else
+                {
+                    edit.Insert(pos, ftllmResponse);
+                }
+                edit.Apply();
+
+                // Move the caret to the end of the inserted/replaced text
+                var newCaretPosition = pos.Position + ftllmResponse.Length;
+                docView.TextView.Caret.MoveTo(new SnapshotPoint(docView.TextBuffer.CurrentSnapshot, newCaretPosition));
+            }
+            numCaps = 0;
         }
     }
 
@@ -180,6 +287,50 @@ namespace NvAssist
         {
             await this.RegisterCommandsAsync();
             TextViewCreationListener changeListener;
+            string currentDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+
+            // Specify the relative path to the FineTuning directory and the Python script
+            string fineTuningDirectory = Path.Combine(currentDirectory, "FineTuning");
+            string scriptPath = Path.Combine(fineTuningDirectory, "setupEnv.py");
+
+            // Start the Python process with the specified script
+            //Process.Start("python", scriptPath);
+
+
+            ProcessStartInfo processStartInfo = new ProcessStartInfo("python", scriptPath)
+            {
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+
+            Process process = new Process
+            {
+                StartInfo = processStartInfo
+            };
+
+            // Event handlers to capture stdout and stderr in real-time
+            process.OutputDataReceived += (sender, args) =>
+            {
+                if (!string.IsNullOrEmpty(args.Data))
+                {
+                    Console.WriteLine($"[stdout] {args.Data}");
+                }
+            };
+
+            process.ErrorDataReceived += (sender, args) =>
+            {
+                if (!string.IsNullOrEmpty(args.Data))
+                {
+                    Console.WriteLine($"[stderr] {args.Data}");
+                }
+            };
+
+            // Start process and begin reading output
+            process.Start();
+            process.BeginOutputReadLine();
+            process.BeginErrorReadLine();
         }
     }
 }
