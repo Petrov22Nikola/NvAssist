@@ -9,7 +9,7 @@ namespace NvAssist
     {
         public const string Id = "NvAssist.4b5741a1-bc59-4ad5-a7b8-1d7fb720bb6e";
         public const string Name = "NvAssist";
-        public const string Description = @"Empty VSIX Project.";
+        public const string Description = @"Productivity tool.";
         public const string Language = "en-US";
         public const string Version = "1.0";
         public const string Author = "NVIDIA";

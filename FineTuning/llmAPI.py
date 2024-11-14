@@ -16,11 +16,12 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # Qwen-Coder-Instruct-7B
 qwenModelName = "Qwen/Qwen2.5-Coder-7B-Instruct"
 qwenAdapterPath = os.path.join(os.path.dirname(os.path.abspath(__file__)), "qwen7b-instr-finetuned")
-qwenTokenizer = AutoTokenizer.from_pretrained(qwenModelName)
+qwenTokenizer = AutoTokenizer.from_pretrained(qwenModelName, local_files_only=True)
 qwenModel = AutoModelForCausalLM.from_pretrained(
     qwenModelName,
     torch_dtype="auto",
-    device_map="auto"
+    device_map="auto",
+    local_files_only=True
 )
 qwenModel = PeftModel.from_pretrained(qwenModel, qwenAdapterPath)
 qwenModel.to(device)
@@ -28,13 +29,14 @@ qwenModel.to(device)
 # CodeGemma-2B
 gemmaModelName = "google/codegemma-2b"
 gemmaAdapterPath = os.path.join(os.path.dirname(os.path.abspath(__file__)), "codegemma2b")
-gemmaTokenizer = AutoTokenizer.from_pretrained(gemmaModelName)
+gemmaTokenizer = AutoTokenizer.from_pretrained(gemmaModelName, local_files_only=True)
 if gemmaTokenizer.pad_token is None:
     gemmaTokenizer.pad_token = gemmaTokenizer.eos_token
 gemmaModel = AutoModelForCausalLM.from_pretrained(
     gemmaModelName,
     torch_dtype="auto",
-    device_map="auto"
+    device_map="auto",
+    local_files_only=True
 )
 gemmaModel = PeftModel.from_pretrained(gemmaModel, gemmaAdapterPath)
 gemmaModel.to(device)
@@ -114,6 +116,5 @@ async def generateText(request: PromptRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+import uvicorn
+uvicorn.run(app, host="127.0.0.1", port=8000)

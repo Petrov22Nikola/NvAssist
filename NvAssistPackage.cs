@@ -25,6 +25,7 @@ using System.Linq;
 using System.Reflection;
 using System.Diagnostics;
 using System.Windows.Input;
+using Microsoft.VisualStudio.Shell.Interop;
 
 [Export(typeof(IWpfTextViewCreationListener))]
 [ContentType("text")]
@@ -300,56 +301,27 @@ namespace NvAssist
     [InstalledProductRegistration(Vsix.Name, Vsix.Description, Vsix.Version)]
     [ProvideMenuResource("Menus.ctmenu", 1)]
     [Guid(PackageGuids.NvAssistString)]
+    [ProvideAutoLoad(UIContextGuids80.NoSolution, PackageAutoLoadFlags.BackgroundLoad)]
     public sealed class NvAssistPackage : ToolkitPackage
     {
         protected override async Task InitializeAsync(CancellationToken cancellationToken, IProgress<ServiceProgressData> progress)
         {
-            await this.RegisterCommandsAsync();
-            TextViewCreationListener changeListener;
-            string currentDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            string assemblyLocation = Assembly.GetExecutingAssembly().Location;
+            string installDirectory = Path.GetDirectoryName(assemblyLocation);
 
-            // Specify the relative path to the FineTuning directory and the Python script
-            string fineTuningDirectory = Path.Combine(currentDirectory, "FineTuning");
-            string scriptPath = Path.Combine(fineTuningDirectory, "setupEnv.py");
+            string fineTuningDirectory = Path.Combine(installDirectory, "dist");
+            string exePath = Path.Combine(fineTuningDirectory, "setupEnv.exe");
 
-            // Start the Python process with the specified script
-            //Process.Start("python", scriptPath);
-
-
-            ProcessStartInfo processStartInfo = new ProcessStartInfo("python", scriptPath)
+            ProcessStartInfo startInfo = new ProcessStartInfo
             {
+                FileName = exePath,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 UseShellExecute = false,
                 CreateNoWindow = true
             };
 
-            Process process = new Process
-            {
-                StartInfo = processStartInfo
-            };
-
-            // Event handlers to capture stdout and stderr in real-time
-            process.OutputDataReceived += (sender, args) =>
-            {
-                if (!string.IsNullOrEmpty(args.Data))
-                {
-                    Console.WriteLine($"[stdout] {args.Data}");
-                }
-            };
-
-            process.ErrorDataReceived += (sender, args) =>
-            {
-                if (!string.IsNullOrEmpty(args.Data))
-                {
-                    Console.WriteLine($"[stderr] {args.Data}");
-                }
-            };
-
-            // Start process and begin reading output
-            process.Start();
-            process.BeginOutputReadLine();
-            process.BeginErrorReadLine();
+            Process.Start(startInfo);
         }
     }
 }

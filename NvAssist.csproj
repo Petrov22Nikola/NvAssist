@@ -45,8 +45,13 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
+    <Content Include="dist\setupEnv.exe">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <IncludeInVSIX>true</IncludeInVSIX>
+    </Content>
+  </ItemGroup>
+  <ItemGroup>
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Commands\NvAssist.cs" />
     <Compile Include="NvAssistPackage.cs" />
     <Compile Include="source.extension.cs">
       <AutoGen>True</AutoGen>
