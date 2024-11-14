@@ -24,6 +24,7 @@ using System.Windows.Media.TextFormatting;
 using System.Linq;
 using System.Reflection;
 using System.Diagnostics;
+using System.Windows.Input;
 
 [Export(typeof(IWpfTextViewCreationListener))]
 [ContentType("text")]
@@ -32,6 +33,7 @@ internal class TextViewCreationListener : IWpfTextViewCreationListener
 {
     async Task<string> QueryQwenFinetuned(string text)
     {
+        Mouse.OverrideCursor = Cursors.Wait;
         using (var client = new HttpClient())
         {
             var payload = new { prompt = text };
@@ -41,6 +43,7 @@ internal class TextViewCreationListener : IWpfTextViewCreationListener
 
             // Query the local FastAPI server
             var response = await client.PostAsync("http://localhost:8000/generate", content);
+            Mouse.OverrideCursor = null;
 
             if (response.IsSuccessStatusCode)
             {
@@ -57,6 +60,7 @@ internal class TextViewCreationListener : IWpfTextViewCreationListener
 
     async Task<string> QueryGemma(string text)
     {
+        Mouse.OverrideCursor = Cursors.Wait;
         using (var client = new HttpClient())
         {
             var payload = new { prompt = text };
@@ -66,6 +70,7 @@ internal class TextViewCreationListener : IWpfTextViewCreationListener
 
             // Query the local FastAPI server
             var response = await client.PostAsync("http://localhost:8000/autocomplete", content);
+            Mouse.OverrideCursor = null;
 
             if (response.IsSuccessStatusCode)
             {
@@ -154,7 +159,6 @@ internal class TextViewCreationListener : IWpfTextViewCreationListener
 
         if (e.Key == System.Windows.Input.Key.LeftShift)
         {
-            // Check time difference for Shift key
             if (currentTime - lastShiftTime < TimeSpan.FromSeconds(0.3))
             {
                 ++numShifts;
@@ -173,8 +177,7 @@ internal class TextViewCreationListener : IWpfTextViewCreationListener
 
         if (e.Key == System.Windows.Input.Key.CapsLock)
         {
-            // Check time difference for Caps Lock key
-            if (currentTime - lastCapsLockTime < TimeSpan.FromSeconds(0.5))
+            if (currentTime - lastCapsLockTime < TimeSpan.FromSeconds(0.3))
             {
                 ++numCaps;
                 lastCapsLockTime = currentTime;
@@ -205,7 +208,7 @@ internal class TextViewCreationListener : IWpfTextViewCreationListener
             string fimSuffix = GetFimSuffix(currentLine);
 
             string fimPrompt = $"<|fim_prefix|>{fimPrefix}<|fim_suffix|>{fimSuffix}<|fim_middle|>";
-            Message("Query: " + fimPrompt);
+            //Message("Query: " + fimPrompt);
 
             string llmResponse = await QueryGemma(fimPrompt);
             llmResponse = llmResponse.Replace("\\n", "\n");
@@ -215,7 +218,7 @@ internal class TextViewCreationListener : IWpfTextViewCreationListener
                 llmResponse = llmResponse.Replace(stopToken, string.Empty);
             }
 
-            Message("LLM Response: " + llmResponse);
+            //Message("LLM Response: " + llmResponse);
 
             using (var edit = docView.TextBuffer.CreateEdit())
             {
@@ -230,56 +233,42 @@ internal class TextViewCreationListener : IWpfTextViewCreationListener
 
         if (numCaps == capsThreshold)
         {
-            // Check if there's a text selection
             var selection = docView.TextView.Selection;
             string queryText;
 
             if (!selection.IsEmpty)
             {
-                // Use the selected text as the query
                 queryText = selection.SelectedSpans[0].GetText();
             }
             else
             {
-                // Fall back to current line if no selection
                 queryText = currentLine.GetText();
             }
 
             string ftllmResponse = await QueryQwenFinetuned(queryText);
             ftllmResponse = "\n" + ftllmResponse.Replace("\\n", "\n");
 
-            // Check if the response contains "```" tags
             const string codeTag = "```";
             if (ftllmResponse.Contains(codeTag))
             {
-                // Find the first and last occurrence of "```"
                 int firstTagIndex = ftllmResponse.IndexOf(codeTag);
                 int lastTagIndex = ftllmResponse.LastIndexOf(codeTag);
 
-                // Ensure there are at least two "```" tags before proceeding
                 if (firstTagIndex != lastTagIndex)
                 {
-                    // Find the index of the newline after the first "```" tag
                     int firstNewlineAfterTag = ftllmResponse.IndexOf('\n', firstTagIndex);
-
-                    // If no newline is found, default to the end of string
                     if (firstNewlineAfterTag == -1)
                     {
                         firstNewlineAfterTag = ftllmResponse.Length;
                     }
-
-                    // Extract content between the newline after the first tag and just before the last tag
-                    int startIndex = firstNewlineAfterTag + 1;  // Start after the newline
+                    int startIndex = firstNewlineAfterTag + 1;
                     int length = lastTagIndex - startIndex;
                     ftllmResponse = ftllmResponse.Substring(startIndex, length).Trim();
                 }
             }
 
-            Message("LLM Response: " + ftllmResponse);
-
             using (var edit = docView.TextBuffer.CreateEdit())
             {
-                // If there's a selection, replace it; otherwise, insert at caret
                 if (!selection.IsEmpty)
                 {
                     var selectedSpan = selection.SelectedSpans;
@@ -291,7 +280,6 @@ internal class TextViewCreationListener : IWpfTextViewCreationListener
                 }
                 edit.Apply();
 
-                // Move the caret to the end of the inserted/replaced text
                 var newCaretPosition = pos.Position + ftllmResponse.Length;
                 docView.TextView.Caret.MoveTo(new SnapshotPoint(docView.TextBuffer.CurrentSnapshot, newCaretPosition));
             }

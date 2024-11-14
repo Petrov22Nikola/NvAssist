@@ -83,7 +83,7 @@ async def autocomplete(request: PromptRequest):
 async def generateText(request: PromptRequest):
     try:
         messages = [
-            {"role": "system", "content": "You are a helpful assistant. Generate clean, well-structured code that follows best practices. Output only plain text."},
+            {"role": "system", "content": "You are a helpful assistant. Generate clean, well-structured code that follows best practices. Adhere to the whitespace and indendentation of the prompt."},
             {"role": "user", "content": request.prompt}
         ]
 
