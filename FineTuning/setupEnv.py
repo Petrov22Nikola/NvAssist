@@ -2,14 +2,23 @@ import subprocess
 import sys
 import os
 
+def EnsurePipInstalled():
+    try:
+        subprocess.check_call([sys.executable, "-m", "pip", "--version"])
+    except subprocess.CalledProcessError:
+        subprocess.check_call([sys.executable, "-m", "ensurepip", "--upgrade"])
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "--upgrade", "pip"])
+
 def install(package):
     subprocess.check_call([sys.executable, "-m", "pip", "install", package])
 
-# Install required packages
+EnsurePipInstalled()
+
+install("torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118")
 install("transformers")
-install("torch")
 install("fastapi")
 install("uvicorn")
+install("peft")
 
 # Start FastAPI server in a separate process
 curDir = os.path.dirname(os.path.abspath(__file__))
