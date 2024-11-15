@@ -15,6 +15,17 @@
 
     <!--This section defines the elements the user can interact with, like a menu command or a button
         or combo box in a toolbar. -->
+	  <Buttons>
+		  <Button guid="NvAssist" id="NvAssist" priority="0x0100" type="Button">
+			  <Parent guid="NvAssist" id="MyMenuGroup" />
+			  <Icon guid="ImageCatalogGuid" id="StatusInformation" />
+			  <CommandFlag>IconIsMoniker</CommandFlag>
+			  <Strings>
+				  <ButtonText>NvAssist</ButtonText>
+				  <LocCanonicalName>.NvAssist.NvAssist</LocCanonicalName>
+			  </Strings>
+		  </Button>
+	  </Buttons>
   </Commands>
 
   <Symbols>

@@ -48,9 +48,11 @@ class CustomStopCriteria(StoppingCriteria):
         super().__init__()
         self.stopIds = stopIds
 
-    def __call__(self, input_ids, scores, **kwargs):
+    def __call__(self, input_ids: torch.LongTensor, scores: torch.FloatTensor, **kwargs):
         for stopId in self.stopIds:
-            if stopId in input_ids[0][-len(stopId):]:
+            stop_tensor = torch.tensor(stopId, device=input_ids.device)
+            
+            if torch.equal(input_ids[0][-len(stop_tensor):], stop_tensor):
                 return True
         return False
 
@@ -63,7 +65,7 @@ async def autocomplete(request: PromptRequest):
         stopping_criteria = StoppingCriteriaList([CustomStopCriteria(stopIds)])
 
         with torch.no_grad():
-            gen_ids = gemmaModel.generate(
+            genIds = gemmaModel.generate(
                 **model_inputs,
                 max_new_tokens=100,
                 num_return_sequences=1,
@@ -73,9 +75,9 @@ async def autocomplete(request: PromptRequest):
             )
 
         # Filter out input prompt tokens
-        gen_ids = gen_ids[:, len(model_inputs['input_ids'][0]):]
-        gen_text = gemmaTokenizer.decode(gen_ids[0], skip_special_tokens=True)
-        return gen_text
+        genIds = genIds[:, len(model_inputs['input_ids'][0]):]
+        genText = gemmaTokenizer.decode(genIds[0], skip_special_tokens=True)
+        return genText
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -115,6 +117,19 @@ async def generateText(request: PromptRequest):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    
+from fastapi.responses import PlainTextResponse
+
+# Add this new endpoint after your existing endpoints
+@app.get("/hello", response_class=PlainTextResponse)
+async def hello_endpoint():
+    """
+    A simple endpoint that returns a plain text greeting.
+    
+    Returns:
+        str: A greeting message
+    """
+    return "Hello, World! This is a test endpoint."
 
 import uvicorn
 uvicorn.run(app, host="127.0.0.1", port=8000)

@@ -3,7 +3,7 @@
     <Metadata>
         <Identity Id="NvAssist.4b5741a1-bc59-4ad5-a7b8-1d7fb720bb6e" Version="1.0" Language="en-US" Publisher="NVIDIA" />
         <DisplayName>NvAssist</DisplayName>
-        <Description>Empty VSIX Project.</Description>
+        <Description>Productivity tool.</Description>
         <Icon>Resources\Icon.png</Icon>
         <PreviewImage>Resources\Icon.png</PreviewImage>
     </Metadata>

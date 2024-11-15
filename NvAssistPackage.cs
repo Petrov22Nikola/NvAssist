@@ -28,7 +28,7 @@ using System.Windows.Input;
 using Microsoft.VisualStudio.Shell.Interop;
 
 [Export(typeof(IWpfTextViewCreationListener))]
-[ContentType("text")]
+[ContentType("any")]
 [TextViewRole(PredefinedTextViewRoles.Editable)]
 internal class TextViewCreationListener : IWpfTextViewCreationListener
 {
@@ -306,22 +306,18 @@ namespace NvAssist
     {
         protected override async Task InitializeAsync(CancellationToken cancellationToken, IProgress<ServiceProgressData> progress)
         {
+            await base.InitializeAsync(cancellationToken, progress);
+            await this.RegisterCommandsAsync();
+            TextViewCreationListener changeListener;
+
+            // Initialization logic here
             string assemblyLocation = Assembly.GetExecutingAssembly().Location;
             string installDirectory = Path.GetDirectoryName(assemblyLocation);
 
-            string fineTuningDirectory = Path.Combine(installDirectory, "dist");
-            string exePath = Path.Combine(fineTuningDirectory, "setupEnv.exe");
+            string fineTuningDirectory = Path.Combine(installDirectory, "FineTuning");
+            string scriptPath = Path.Combine(fineTuningDirectory, "setupEnv.py");
 
-            ProcessStartInfo startInfo = new ProcessStartInfo
-            {
-                FileName = exePath,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
-
-            Process.Start(startInfo);
+            Process.Start("python", scriptPath);
         }
     }
 }
