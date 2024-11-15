@@ -165,6 +165,23 @@ internal class TextViewCreationListener : IWpfTextViewCreationListener
         return string.Join("\n", lines);
     }
 
+    private string GetLeadingWhitespace(string text)
+    {
+        return new string(text.TakeWhile(char.IsWhiteSpace).ToArray());
+    }
+
+    private string FormatWithLeadingWhitespace(string response, string leadingWhitespace)
+    {
+        var lines = response.Split(new[] { '\n' }, StringSplitOptions.None);
+
+        for (int i = 0; i < lines.Length; i++)
+        {
+            lines[i] = leadingWhitespace + lines[i];
+        }
+
+        return string.Join("\n", lines);
+    }
+
     int numShifts = 0, numCaps = 0, shiftThreshold = 2, capsThreshold = 2;
     private DateTime lastCapsLockTime = DateTime.MinValue;
     private DateTime lastShiftTime = DateTime.MinValue;
@@ -221,7 +238,7 @@ internal class TextViewCreationListener : IWpfTextViewCreationListener
         if (numShifts == shiftThreshold)
         {
             string fimPrefix = GetFimPrefix(currentLine);
-            string fimSuffix = GetFimSuffix(currentLine);
+            //string fimSuffix = GetFimSuffix(currentLine);
 
             string fimPrompt = $"{fimPrefix}";
             //Message("Query: " + fimPrompt);
@@ -249,6 +266,9 @@ internal class TextViewCreationListener : IWpfTextViewCreationListener
             }
 
             //Message("LLM Response: " + llmResponse);
+
+            string leadingWhitespace = GetLeadingWhitespace(currentLine.GetText());
+            llmResponse = FormatWithLeadingWhitespace(llmResponse, leadingWhitespace);
 
             using (var edit = docView.TextBuffer.CreateEdit())
             {
@@ -297,6 +317,9 @@ internal class TextViewCreationListener : IWpfTextViewCreationListener
                 }
             }
 
+            string leadingWhitespace = GetLeadingWhitespace(currentLine.GetText());
+            ftllmResponse = FormatWithLeadingWhitespace(ftllmResponse, leadingWhitespace);
+
             using (var edit = docView.TextBuffer.CreateEdit())
             {
                 if (!selection.IsEmpty)
@@ -339,14 +362,22 @@ namespace NvAssist
             await this.RegisterCommandsAsync();
             TextViewCreationListener changeListener;
 
-            // Initialization logic here
             string assemblyLocation = Assembly.GetExecutingAssembly().Location;
             string installDirectory = Path.GetDirectoryName(assemblyLocation);
 
             string fineTuningDirectory = Path.Combine(installDirectory, "FineTuning");
             string scriptPath = Path.Combine(fineTuningDirectory, "setupEnv.py");
 
-            Process.Start("python", scriptPath);
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = "python",
+                Arguments = scriptPath,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                WindowStyle = ProcessWindowStyle.Hidden
+            };
+
+            Process.Start(startInfo);
         }
     }
 }
