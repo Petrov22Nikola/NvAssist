@@ -46,8 +46,8 @@
   </PropertyGroup>
   <ItemGroup>
     <Content Include="FineTuning\**\*.*">
-        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-        <IncludeInVSIX>true</IncludeInVSIX>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
   </ItemGroup>
   <ItemGroup>

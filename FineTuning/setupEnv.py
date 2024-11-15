@@ -10,11 +10,11 @@ def EnsurePipInstalled():
         subprocess.check_call([sys.executable, "-m", "pip", "install", "--upgrade", "pip"])
 
 def install(package):
-    subprocess.check_call([sys.executable, "-m", "pip", "install", package])
+    subprocess.check_call([sys.executable, "-m", "pip", "install"] + package.split())
 
 EnsurePipInstalled()
 
-install("torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118")
+install("torch --index-url https://download.pytorch.org/whl/cu118")
 install("transformers")
 install("fastapi")
 install("uvicorn")

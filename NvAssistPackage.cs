@@ -68,7 +68,7 @@ internal class TextViewCreationListener : IWpfTextViewCreationListener
         }
     }
 
-    async Task<string> QueryGemma(string text)
+    async Task<string> QueryCodeGen(string text)
     {
         Mouse.OverrideCursor = Cursors.Wait;
         using (var client = new HttpClient())
@@ -223,15 +223,29 @@ internal class TextViewCreationListener : IWpfTextViewCreationListener
             string fimPrefix = GetFimPrefix(currentLine);
             string fimSuffix = GetFimSuffix(currentLine);
 
-            string fimPrompt = $"<|fim_prefix|>{fimPrefix}<|fim_suffix|>{fimSuffix}<|fim_middle|>";
+            string fimPrompt = $"{fimPrefix}";
             //Message("Query: " + fimPrompt);
 
-            string llmResponse = await QueryGemma(fimPrompt);
-            llmResponse = llmResponse.Replace("\\n", "\n");
-            string[] stopTokens = { "<|fim_prefix|>", "<|fim_suffix|>", "<|fim_middle|>", "<|file_separator|>" };
-            foreach (var stopToken in stopTokens)
+            string llmResponse = await QueryCodeGen(fimPrompt);
+            llmResponse = "\n" + llmResponse.Replace("\\n", "\n");
+
+            const string codeTag = "```";
+            if (llmResponse.Contains(codeTag))
             {
-                llmResponse = llmResponse.Replace(stopToken, string.Empty);
+                int firstTagIndex = llmResponse.IndexOf(codeTag);
+                int lastTagIndex = llmResponse.LastIndexOf(codeTag);
+
+                if (firstTagIndex != lastTagIndex)
+                {
+                    int firstNewlineAfterTag = llmResponse.IndexOf('\n', firstTagIndex);
+                    if (firstNewlineAfterTag == -1)
+                    {
+                        firstNewlineAfterTag = llmResponse.Length;
+                    }
+                    int startIndex = firstNewlineAfterTag + 1;
+                    int length = lastTagIndex - startIndex;
+                    llmResponse = llmResponse.Substring(startIndex, length).Trim();
+                }
             }
 
             //Message("LLM Response: " + llmResponse);

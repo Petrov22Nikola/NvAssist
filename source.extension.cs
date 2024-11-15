@@ -11,7 +11,7 @@ namespace NvAssist
         public const string Name = "NvAssist";
         public const string Description = @"Productivity tool.";
         public const string Language = "en-US";
-        public const string Version = "1.2";
+        public const string Version = "1.5";
         public const string Author = "NVIDIA";
         public const string Tags = "";
     }
