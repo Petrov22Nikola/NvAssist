@@ -32,6 +32,8 @@ using Microsoft.VisualStudio.Shell.Interop;
 [TextViewRole(PredefinedTextViewRoles.Editable)]
 internal class TextViewCreationListener : IWpfTextViewCreationListener
 {
+    string llmUnreachable = "LLM endpoint unreachable, please try again later.";
+
     async Task<string> QueryQwenFinetuned(string text)
     {
         Mouse.OverrideCursor = Cursors.Wait;
@@ -43,18 +45,25 @@ internal class TextViewCreationListener : IWpfTextViewCreationListener
             var content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
 
             // Query the local FastAPI server
-            var response = await client.PostAsync("http://localhost:8000/generate", content);
-            Mouse.OverrideCursor = null;
-
-            if (response.IsSuccessStatusCode)
+            try
             {
-                string vuidCheck = await response.Content.ReadAsStringAsync();
-                vuidCheck = vuidCheck.Trim('"');
-                return vuidCheck;
+                var response = await client.PostAsync("http://localhost:8000/generate", content);
+                Mouse.OverrideCursor = null;
+                if (response.IsSuccessStatusCode)
+                {
+                    string vuidCheck = await response.Content.ReadAsStringAsync();
+                    vuidCheck = vuidCheck.Trim('"');
+                    return vuidCheck;
+                }
+                else
+                {
+                    return llmUnreachable;
+                }
             }
-            else
+            catch (Exception ex)
             {
-                throw new Exception("Failed to get response from Hugging Face model");
+                Mouse.OverrideCursor = null;
+                return llmUnreachable;
             }
         }
     }
@@ -70,18 +79,24 @@ internal class TextViewCreationListener : IWpfTextViewCreationListener
             var content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
 
             // Query the local FastAPI server
-            var response = await client.PostAsync("http://localhost:8000/autocomplete", content);
-            Mouse.OverrideCursor = null;
-
-            if (response.IsSuccessStatusCode)
+            try 
             {
-                string autoCode = await response.Content.ReadAsStringAsync();
-                autoCode = autoCode.Trim('"');
-                return autoCode;
-            }
-            else
+                var response = await client.PostAsync("http://localhost:8000/autocomplete", content);
+                Mouse.OverrideCursor = null;
+                if (response.IsSuccessStatusCode)
+                {
+                    string autoCode = await response.Content.ReadAsStringAsync();
+                    autoCode = autoCode.Trim('"');
+                    return autoCode;
+                }
+                else
+                {
+                    return llmUnreachable;
+                }
+            } catch (Exception e)
             {
-                throw new Exception("Failed to get response from Hugging Face model");
+                Mouse.OverrideCursor = null;
+                return llmUnreachable;
             }
         }
     }
